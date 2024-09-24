@@ -1,5 +1,6 @@
 import os
 import pickle as pickle_tts
+import warnings
 from typing import Any, Callable, Dict, Union
 
 import fsspec
@@ -42,16 +43,18 @@ def load_fsspec(
         Object stored in path.
     """
     is_local = os.path.isdir(path) or os.path.isfile(path)
-    if cache and not is_local:
-        with fsspec.open(
-            f"filecache::{path}",
-            filecache={"cache_storage": str(get_user_data_dir("tts_cache"))},
-            mode="rb",
-        ) as f:
-            return torch.load(f, map_location=map_location, **kwargs)
-    else:
-        with fsspec.open(path, "rb") as f:
-            return torch.load(f, map_location=map_location, **kwargs)
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", category=FutureWarning, module="torch.serialization")
+        if cache and not is_local:
+            with fsspec.open(
+                f"filecache::{path}",
+                filecache={"cache_storage": str(get_user_data_dir("tts_cache"))},
+                mode="rb",
+            ) as f:
+                return torch.load(f, map_location=map_location, **kwargs)
+        else:
+            with fsspec.open(path, "rb") as f:
+                return torch.load(f, map_location=map_location, **kwargs)
 
 
 def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False, cache=False):  # pylint: disable=redefined-builtin
