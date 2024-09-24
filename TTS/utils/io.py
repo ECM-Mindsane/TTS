@@ -51,10 +51,12 @@ def load_fsspec(
             return torch.load(f, map_location=map_location, **kwargs)
     else:
         with fsspec.open(path, "rb") as f:
-            return torch.load(f, map_location=map_location, weights_only=True, **kwargs)
+            return torch.load(f, map_location=map_location, **kwargs)
 
 
-def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False, cache=False):  # pylint: disable=redefined-builtin
+def load_checkpoint(
+    model, checkpoint_path, use_cuda=False, eval=False, cache=False
+):  # pylint: disable=redefined-builtin
     try:
         state = load_fsspec(checkpoint_path, map_location=torch.device("cpu"), cache=cache)
     except ModuleNotFoundError:
