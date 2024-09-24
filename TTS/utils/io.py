@@ -1,7 +1,3 @@
-import warnings
-
-warnings.filterwarnings("ignore", category=FutureWarning, module="torch.serialization")
-
 import os
 import pickle as pickle_tts
 from typing import Any, Callable, Dict, Union
@@ -52,10 +48,10 @@ def load_fsspec(
             filecache={"cache_storage": str(get_user_data_dir("tts_cache"))},
             mode="rb",
         ) as f:
-            return torch.load(f, map_location=map_location, weights_only=True, **kwargs)
+            return torch.load(f, map_location=map_location, **kwargs)
     else:
         with fsspec.open(path, "rb") as f:
-            return torch.load(f, map_location=map_location, weights_only=True, **kwargs)
+            return torch.load(f, map_location=map_location, **kwargs)
 
 
 def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False, cache=False):  # pylint: disable=redefined-builtin
