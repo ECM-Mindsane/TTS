@@ -44,7 +44,7 @@ def load_fsspec(
     """
     is_local = os.path.isdir(path) or os.path.isfile(path)
     with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", category=FutureWarning, module="torch.serialization")
+        warnings.filterwarnings("ignore")
         if cache and not is_local:
             with fsspec.open(
                 f"filecache::{path}",
