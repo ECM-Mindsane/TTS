@@ -38,6 +38,7 @@ class Synthesizer(nn.Module):
         model_dir: str = "",
         voice_dir: str = None,
         use_cuda: bool = False,
+        verbose: bool = False,
     ) -> None:
         """General 🐸 TTS interface for inference. It takes a tts and a vocoder
         model and synthesize speech from the provided text.
@@ -73,6 +74,7 @@ class Synthesizer(nn.Module):
         self.vc_checkpoint = vc_checkpoint
         self.vc_config = vc_config
         self.use_cuda = use_cuda
+        self.verbose = verbose
 
         self.tts_model = None
         self.vocoder_model = None
@@ -198,9 +200,7 @@ class Synthesizer(nn.Module):
 
     def _set_speaker_encoder_paths_from_tts_config(self):
         """Set the encoder paths from the tts model config for models with speaker encoders."""
-        if hasattr(self.tts_config, "model_args") and hasattr(
-            self.tts_config.model_args, "speaker_encoder_config_path"
-        ):
+        if hasattr(self.tts_config, "model_args") and hasattr(self.tts_config.model_args, "speaker_encoder_config_path"):
             self.encoder_checkpoint = self.tts_config.model_args.speaker_encoder_model_path
             self.encoder_config = self.tts_config.model_args.speaker_encoder_config_path
 
@@ -287,16 +287,16 @@ class Synthesizer(nn.Module):
         wavs = []
 
         if not text and not reference_wav:
-            raise ValueError(
-                "You need to define either `text` (for sythesis) or a `reference_wav` (for voice conversion) to use the Coqui TTS API."
-            )
+            raise ValueError("You need to define either `text` (for sythesis) or a `reference_wav` (for voice conversion) to use the Coqui TTS API.")
 
         if text:
             sens = [text]
             if split_sentences:
-                print(" > Text splitted to sentences.")
+                if self.verbose:
+                    print(" > Text splitted to sentences.")
                 sens = self.split_into_sentences(text)
-            print(sens)
+            if self.verbose:
+                print(sens)
 
         # handle multi-speaker
         if "voice_dir" in kwargs:
@@ -308,9 +308,7 @@ class Synthesizer(nn.Module):
             if speaker_name and isinstance(speaker_name, str) and not self.tts_config.model == "xtts":
                 if self.tts_config.use_d_vector_file:
                     # get the average speaker embedding from the saved d_vectors.
-                    speaker_embedding = self.tts_model.speaker_manager.get_mean_embedding(
-                        speaker_name, num_samples=None, randomize=False
-                    )
+                    speaker_embedding = self.tts_model.speaker_manager.get_mean_embedding(speaker_name, num_samples=None, randomize=False)
                     speaker_embedding = np.array(speaker_embedding)[None, :]  # [1 x embedding_dim]
                 else:
                     # get speaker idx from the speaker name
@@ -335,9 +333,7 @@ class Synthesizer(nn.Module):
         # handle multi-lingual
         language_id = None
         if self.tts_languages_file or (
-            hasattr(self.tts_model, "language_manager") 
-            and self.tts_model.language_manager is not None
-            and not self.tts_config.model == "xtts"
+            hasattr(self.tts_model, "language_manager") and self.tts_model.language_manager is not None and not self.tts_config.model == "xtts"
         ):
             if len(self.tts_model.language_manager.name_to_id) == 1:
                 language_id = list(self.tts_model.language_manager.name_to_id.values())[0]
@@ -420,7 +416,8 @@ class Synthesizer(nn.Module):
                         self.vocoder_config["audio"]["sample_rate"] / self.tts_model.ap.sample_rate,
                     ]
                     if scale_factor[1] != 1:
-                        print(" > interpolating tts model output.")
+                        if self.verbose:
+                            print(" > interpolating tts model output.")
                         vocoder_input = interpolate_vocoder_input(scale_factor, vocoder_input)
                     else:
                         vocoder_input = torch.tensor(vocoder_input).unsqueeze(0)  # pylint: disable=not-callable
@@ -447,19 +444,13 @@ class Synthesizer(nn.Module):
                 if reference_speaker_name and isinstance(reference_speaker_name, str):
                     if self.tts_config.use_d_vector_file:
                         # get the speaker embedding from the saved d_vectors.
-                        reference_speaker_embedding = self.tts_model.speaker_manager.get_embeddings_by_name(
-                            reference_speaker_name
-                        )[0]
-                        reference_speaker_embedding = np.array(reference_speaker_embedding)[
-                            None, :
-                        ]  # [1 x embedding_dim]
+                        reference_speaker_embedding = self.tts_model.speaker_manager.get_embeddings_by_name(reference_speaker_name)[0]
+                        reference_speaker_embedding = np.array(reference_speaker_embedding)[None, :]  # [1 x embedding_dim]
                     else:
                         # get speaker idx from the speaker name
                         reference_speaker_id = self.tts_model.speaker_manager.name_to_id[reference_speaker_name]
                 else:
-                    reference_speaker_embedding = self.tts_model.speaker_manager.compute_embedding_from_clip(
-                        reference_wav
-                    )
+                    reference_speaker_embedding = self.tts_model.speaker_manager.compute_embedding_from_clip(reference_wav)
             outputs = transfer_voice(
                 model=self.tts_model,
                 CONFIG=self.tts_config,
@@ -484,7 +475,8 @@ class Synthesizer(nn.Module):
                     self.vocoder_config["audio"]["sample_rate"] / self.tts_model.ap.sample_rate,
                 ]
                 if scale_factor[1] != 1:
-                    print(" > interpolating tts model output.")
+                    if self.verbose:
+                        print(" > interpolating tts model output.")
                     vocoder_input = interpolate_vocoder_input(scale_factor, vocoder_input)
                 else:
                     vocoder_input = torch.tensor(vocoder_input).unsqueeze(0)  # pylint: disable=not-callable
@@ -500,6 +492,7 @@ class Synthesizer(nn.Module):
         # compute stats
         process_time = time.time() - start_time
         audio_time = len(wavs) / self.tts_config.audio["sample_rate"]
-        print(f" > Processing time: {process_time}")
-        print(f" > Real-time factor: {process_time / audio_time}")
+        if self.verbose:
+            print(f" > Processing time: {process_time}")
+            print(f" > Real-time factor: {process_time / audio_time}")
         return wavs
