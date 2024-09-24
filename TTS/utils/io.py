@@ -1,3 +1,7 @@
+import warnings
+
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch.serialization")
+
 import os
 import pickle as pickle_tts
 from typing import Any, Callable, Dict, Union
@@ -54,9 +58,7 @@ def load_fsspec(
             return torch.load(f, map_location=map_location, **kwargs)
 
 
-def load_checkpoint(
-    model, checkpoint_path, use_cuda=False, eval=False, cache=False
-):  # pylint: disable=redefined-builtin
+def load_checkpoint(model, checkpoint_path, use_cuda=False, eval=False, cache=False):  # pylint: disable=redefined-builtin
     try:
         state = load_fsspec(checkpoint_path, map_location=torch.device("cpu"), cache=cache)
     except ModuleNotFoundError:
