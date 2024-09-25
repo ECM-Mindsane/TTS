@@ -43,7 +43,7 @@ class ModelManager(object):
         verbose (bool): print info. Defaults to True.
     """
 
-    def __init__(self, models_file=None, output_prefix=None, progress_bar=False, verbose=True):
+    def __init__(self, models_file=None, output_prefix=None, progress_bar=False, verbose=False):
         super().__init__()
         self.progress_bar = progress_bar
         self.verbose = verbose
@@ -156,15 +156,11 @@ class ModelManager(object):
                         print(f"> dataset used : {dataset}")
                         print(f"> model name : {model}")
                         if "description" in self.models_dict[model_type][lang][dataset][model]:
-                            print(
-                                f"> description : {self.models_dict[model_type][lang][dataset][model]['description']}"
-                            )
+                            print(f"> description : {self.models_dict[model_type][lang][dataset][model]['description']}")
                         else:
                             print("> description : coming soon")
                         if "default_vocoder" in self.models_dict[model_type][lang][dataset][model]:
-                            print(
-                                f"> default_vocoder : {self.models_dict[model_type][lang][dataset][model]['default_vocoder']}"
-                            )
+                            print(f"> default_vocoder : {self.models_dict[model_type][lang][dataset][model]['default_vocoder']}")
                     else:
                         print(f"> model {model} does not exist for {model_type}/{lang}/{dataset}.")
                 else:
@@ -365,7 +361,8 @@ class ModelManager(object):
             config_remote = json.load(f)
 
         if not config_local == config_remote:
-            print(f" > {model_name} is already downloaded however it has been changed. Redownloading it...")
+            if self.verbose:
+                print(f" > {model_name} is already downloaded however it has been changed. Redownloading it...")
             self.create_dir_and_download_model(model_name, model_item, output_path)
 
     def download_model(self, model_name):
@@ -391,12 +388,15 @@ class ModelManager(object):
                 if os.path.isfile(md5sum_file):
                     with open(md5sum_file, mode="r") as f:
                         if not f.read() == md5sum:
-                            print(f" > {model_name} has been updated, clearing model cache...")
+                            if self.verbose:
+                                print(f" > {model_name} has been updated, clearing model cache...")
                             self.create_dir_and_download_model(model_name, model_item, output_path)
                         else:
-                            print(f" > {model_name} is already downloaded.")
+                            if self.verbose:
+                                print(f" > {model_name} is already downloaded.")
                 else:
-                    print(f" > {model_name} has been updated, clearing model cache...")
+                    if self.verbose:
+                        print(f" > {model_name} has been updated, clearing model cache...")
                     self.create_dir_and_download_model(model_name, model_item, output_path)
             # if the configs are different, redownload it
             # ToDo: we need a better way to handle it
@@ -406,7 +406,8 @@ class ModelManager(object):
                 except:
                     pass
             else:
-                print(f" > {model_name} is already downloaded.")
+                if self.verbose:
+                    print(f" > {model_name} is already downloaded.")
         else:
             self.create_dir_and_download_model(model_name, model_item, output_path)
 
