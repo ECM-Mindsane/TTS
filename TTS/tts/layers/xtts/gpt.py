@@ -72,9 +72,7 @@ def build_hf_gpt_transformer(
     del gpt.wte
 
     mel_pos_emb = (
-        LearnedPositionEmbeddings(max_mel_seq_len, model_dim)
-        if max_mel_seq_len != -1
-        else functools.partial(null_position_embeddings, dim=model_dim)
+        LearnedPositionEmbeddings(max_mel_seq_len, model_dim) if max_mel_seq_len != -1 else functools.partial(null_position_embeddings, dim=model_dim)
     )
     text_pos_emb = (
         LearnedPositionEmbeddings(max_text_seq_len, model_dim)
@@ -188,9 +186,7 @@ class GPT(nn.Module):
     def get_grad_norm_parameter_groups(self):
         return {
             "conditioning_encoder": list(self.conditioning_encoder.parameters()),
-            "conditioning_perceiver": list(self.conditioning_perceiver.parameters())
-            if self.use_perceiver_resampler
-            else None,
+            "conditioning_perceiver": list(self.conditioning_perceiver.parameters()) if self.use_perceiver_resampler else None,
             "gpt": list(self.gpt.parameters()),
             "heads": list(self.text_head.parameters()) + list(self.mel_head.parameters()),
         }
@@ -304,11 +300,7 @@ class GPT(nn.Module):
             return first_logits
 
     def get_conditioning(self, speech_conditioning_input):
-        speech_conditioning_input = (
-            speech_conditioning_input.unsqueeze(1)
-            if len(speech_conditioning_input.shape) == 3
-            else speech_conditioning_input
-        )
+        speech_conditioning_input = speech_conditioning_input.unsqueeze(1) if len(speech_conditioning_input.shape) == 3 else speech_conditioning_input
         conds = []
         for j in range(speech_conditioning_input.shape[1]):
             conds.append(self.conditioning_encoder(speech_conditioning_input[:, j]))
@@ -427,12 +419,8 @@ class GPT(nn.Module):
             audio_codes = F.pad(audio_codes, (0, max_mel_len - audio_codes.shape[-1]))
 
         # 💖 Lovely assertions
-        assert (
-            max_mel_len <= audio_codes.shape[-1]
-        ), f" ❗ max_mel_len ({max_mel_len}) > audio_codes.shape[-1] ({audio_codes.shape[-1]})"
-        assert (
-            max_text_len <= text_inputs.shape[-1]
-        ), f" ❗ max_text_len ({max_text_len}) > text_inputs.shape[-1] ({text_inputs.shape[-1]})"
+        assert max_mel_len <= audio_codes.shape[-1], f" ❗ max_mel_len ({max_mel_len}) > audio_codes.shape[-1] ({audio_codes.shape[-1]})"
+        assert max_text_len <= text_inputs.shape[-1], f" ❗ max_text_len ({max_text_len}) > text_inputs.shape[-1] ({text_inputs.shape[-1]})"
 
         # Append stop token to text inputs
         text_inputs = F.pad(text_inputs[:, :max_text_len], (0, 1), value=self.stop_text_token)
@@ -447,12 +435,8 @@ class GPT(nn.Module):
 
         # Build input and target tensors
         # Prepend start token to inputs and append stop token to targets
-        text_inputs, text_targets = self.set_inputs_and_targets(
-            text_inputs, self.start_text_token, self.stop_text_token
-        )
-        audio_codes, mel_targets = self.set_inputs_and_targets(
-            audio_codes, self.start_audio_token, self.stop_audio_token
-        )
+        text_inputs, text_targets = self.set_inputs_and_targets(text_inputs, self.start_text_token, self.stop_text_token)
+        audio_codes, mel_targets = self.set_inputs_and_targets(audio_codes, self.start_audio_token, self.stop_audio_token)
 
         # Set attn_mask
         attn_mask_cond = None
@@ -546,12 +530,8 @@ class GPT(nn.Module):
             mel_targets[idx, cond_start:cond_end] = -1
 
         # Compute losses
-        loss_text = F.cross_entropy(
-            text_logits, text_targets.long(), ignore_index=-1, label_smoothing=self.label_smoothing
-        )
-        loss_mel = F.cross_entropy(
-            mel_logits, mel_targets.long(), ignore_index=-1, label_smoothing=self.label_smoothing
-        )
+        loss_text = F.cross_entropy(text_logits, text_targets.long(), ignore_index=-1, label_smoothing=self.label_smoothing)
+        loss_mel = F.cross_entropy(mel_logits, mel_targets.long(), ignore_index=-1, label_smoothing=self.label_smoothing)
         return loss_text.mean(), loss_mel.mean(), mel_logits
 
     def inference(self, cond_latents, text_inputs, **hf_generate_kwargs):
@@ -587,8 +567,20 @@ class GPT(nn.Module):
         **hf_generate_kwargs,
     ):
         gpt_inputs = self.compute_embeddings(cond_latents, text_inputs)
+
+        try:
+            attention_mask = torch.ones(
+                gpt_inputs.shape[0],
+                gpt_inputs.shape[1],
+                dtype=torch.bool,
+                device=gpt_inputs.device,
+            )
+        except:
+            attention_mask = torch.ones_like(gpt_inputs)
+
         gen = self.gpt_inference.generate(
             gpt_inputs,
+            attention_mask=attention_mask,
             bos_token_id=self.start_audio_token,
             pad_token_id=self.stop_audio_token,
             eos_token_id=self.stop_audio_token,
